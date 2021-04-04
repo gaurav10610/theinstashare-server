@@ -1,0 +1,31 @@
+{
+  "name": "instashare-server",
+  "version": "1.0.0",
+  "description": "A realtime communication server",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start:dev": "nodemon start.js",
+    "start:prod": "nodemon start.js --ssl=true --stopAllLogs=true",
+    "cluster:dev": "nodemon start.js --cluster=true",
+    "cluster:prod": "nodemon start.js --ssl=true --cluster=true --stopAllLogs=true"
+  },
+  "keywords": [
+    "webrtc",
+    "datachannel",
+    "signaling",
+    "server",
+    "realtime"
+  ],
+  "author": "lucifer_next_door",
+  "license": "ISC",
+  "dependencies": {
+    "async": "3.2.0",
+    "body-parser": "1.19.0",
+    "express": "4.17.1",
+    "nodemon": "2.0.6",
+    "socket.io": "2.3.0",
+    "socket.io-client": "2.3.1",
+    "winston": "3.3.3"
+  }
+}
