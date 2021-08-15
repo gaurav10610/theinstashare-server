@@ -41,8 +41,14 @@ async function configureMasterProcess() {
 
   let workerSocketServerPort = ServerConstants.SOCKET_SERVER_PORT_START_RANGE;
 
+  const maxServerProcess = global.cmdFlags.maxServerProcess ? global.cmdFlags.maxServerProcess : cpus;
+  logit({
+    text: 'max server processes that will be forked: ' + maxServerProcess,
+    level: ServerConstants.LOG_TYPES.DEBUG
+  });
+
   // Start forking child processes
-  for (let i = 0; i < cpus; i++) {
+  for (let i = 0; i < maxServerProcess; i++) {
 
     workers.push(cluster.fork({
       port: workerSocketServerPort
