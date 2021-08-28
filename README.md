@@ -5,3 +5,14 @@ It&#39;s a real time communication server which uses socket.io nodejs websocket 
 It also supports multi-process socket server clustering out of the box with all the necessary support required to route messages between users connected to different socket server instances running within separate processes through IPC communication channel between master and worker processes.
 
 Server exposes a handful of rest apis to query state of all the active and registered users on server.   
+
+
+```JavaScript
+var s = "JavaScript syntax highlighting";
+alert(s);
+```
+
+```python
+s = "Python syntax highlighting"
+print s
+```

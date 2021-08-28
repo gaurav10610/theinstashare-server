@@ -30,5 +30,8 @@
     "socket.io-client": "2.3.1",
     "winston": "3.3.3",
     "fs-extra": "8.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^7.32.0"
   }
 }
