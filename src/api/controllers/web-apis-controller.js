@@ -1,5 +1,5 @@
 const { ServerConstants } = require('../../utilities/AppConstants');
-const { getUserStatus, getActiveUsers } = require('../impl/service-impl');
+const { getUserStatus, getActiveUsers, handleAppRegistration, getApplicationActiveUsers } = require('../impl/service-impl');
 const express = require('express');
 const bodyParser = require('body-parser');
 const http = require('http');
@@ -28,14 +28,21 @@ function registerApiEndpoints(options) {
     });
 
     /*
-     * API to know the status of a user whether he is online or not
+     * enquire the status of a user whether he is online or not
      */
-    app.get(ServerConstants.API_BASE_URL + 'status/:name', getUserStatus);
+    app.get(`${ServerConstants.API_BASE_URL}status/:name`, getUserStatus);
 
     /*
-     * API to get list of all active users on server excluding user itself
+     * get list of all active users on server excluding user itself
      */
-    app.get(ServerConstants.API_BASE_URL + 'active/users', getActiveUsers);
+    app.get(`${ServerConstants.API_BASE_URL}active/users`, getActiveUsers);
+
+    app.get(`${ServerConstants.API_BASE_URL}application/users`, getApplicationActiveUsers);
+
+    /**
+     * handle user registeration in any application
+     */
+    app.post(`${ServerConstants.API_BASE_URL}application/register`, handleAppRegistration);
 
     if (global.cmdFlags.ssl) {
 
@@ -48,13 +55,13 @@ function registerApiEndpoints(options) {
     }
 
     logit({
-      text: 'theinstashare api server started at port: ' + ServerConstants.EXPRESS_PORT,
+      text: `theinstashare api server started at port: ${ServerConstants.EXPRESS_PORT}`,
       level: ServerConstants.LOG_TYPES.DEBUG
     });
 
   } catch (error) {
     logit({
-      text: 'error while registering api endpoints on express server.',
+      text: 'error while registering api endpoints on express server',
       level: ServerConstants.LOG_TYPES.ERROR
     });
   }

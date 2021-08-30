@@ -15,7 +15,7 @@ function configureWebsocketServer() {
 // new websocket connection has been made
 function webSocketConnection(socket) {
   logit({
-    text: 'websocket connection initiated for socket id: ' + socket.id,
+    text: `websocket connection initiated for socket id: ${socket.id}`,
     level: ServerConstants.LOG_TYPES.DEBUG
   });
 
@@ -27,7 +27,7 @@ function webSocketConnection(socket) {
 function webSocketMessageReceived(message) {
   try {
     logit({
-      text: 'message on socket | type: ' + message.type + ' | from: ' + message.from + '| to: ' + message.to,
+      text: `message on socket|type: ${message.type}|from: ${message.from}|to: ${message.to}`,
       level: ServerConstants.LOG_TYPES.DEBUG
     });
 
@@ -45,7 +45,7 @@ function webSocketMessageReceived(message) {
           broadcastUserState(true, message.from);
 
           logit({
-            text: message.from + ' got connected with server having process id: ' + process.pid,
+            text: `${message.from} got connected!`,
             level: ServerConstants.LOG_TYPES.DEBUG
           });
         }).catch(() => {
@@ -81,7 +81,7 @@ function webSocketMessageReceived(message) {
 // handling websocket connection error
 function webSocketError(error) {
   logit({
-    text: 'websocket connection error with reason: ' + error,
+    text: `websocket connection error with reason: ${error}`,
     level: ServerConstants.LOG_TYPES.ERROR
   });
 }
@@ -89,7 +89,7 @@ function webSocketError(error) {
 // handling websocket server error event
 function webSocketServerError(error) {
   logit({
-    text: 'websocket server error with reason: ' + error,
+    text: `websocket server error with reason: ${error}`,
     level: ServerConstants.ERROR
   });
 }
@@ -102,10 +102,14 @@ function webSocketServerError(error) {
 function registerSocketDisconnectHandler(socket, username) {
   //Registering disconnect listener
   socket.on('disconnect', (reason) => {
+    const currentAppName = global.connectedClients[username][ServerConstants.CURRENT_APPLICATION];
     delete global.connectedClients[username];
+    if (currentAppName) {
+      delete global.applicationsContext[currentAppName][username]
+    }
     broadcastUserState(false, username);
     logit({
-      text: username + ' got disconnected with server having process id: ' + process.pid,
+      text: `${username} got disconnected!`,
       level: ServerConstants.LOG_TYPES.DEBUG
     });
   }); // Here ends the disconnect handler
@@ -162,7 +166,7 @@ function sendSocketMessage(from, to, message) {
   } catch (e) {
     console.log(e);
     logit({
-      text: 'error while sending message on socket | from: ' + from + ' | to: ' + to,
+      text: `error while sending message on socket|from: ${from}|to: ${to}`,
       level: ServerConstants.LOG_TYPES.ERROR
     });
   }
@@ -198,7 +202,7 @@ function deRegisterUser(username, socket) {
     delete global.connectedClients[username];
     socket.removeAllListeners('disconnect');
     logit({
-      text: username + ' got de-registered from server',
+      text: `${username} got de-registered from server`,
       level: ServerConstants.LOG_TYPES.DEBUG
     });
     broadcastUserState(false, username);

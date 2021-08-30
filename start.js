@@ -16,7 +16,7 @@ async function configureMasterProcess() {
   await configureLogger();
 
   // This will store all the forked child processes
-  const workers = [];
+  global.workers = [];
 
   /*
    * This will keep track of all the clients connected to all
@@ -28,8 +28,22 @@ async function configureMasterProcess() {
    */
   global.connectedClients = {};
 
+  /**
+   * this will keep track that which user is currently using which app
+   * 
+   * example - {
+   *  'p2p': {
+   *    'username': socketId // user's socket connection id 
+   *   }
+   * }
+   */
+  global.applicationsContext = {
+    p2p: {},
+    group_chat: {}
+  };
+
   logit({
-    text: 'master process started with process id: ' + process.pid,
+    text: `master process started with process id: ${process.pid}`,
     level: ServerConstants.LOG_TYPES.DEBUG
   });
 
@@ -43,42 +57,48 @@ async function configureMasterProcess() {
 
   const maxServerProcess = global.cmdFlags.maxServerProcess ? global.cmdFlags.maxServerProcess : cpus;
   logit({
-    text: 'max server processes that will be forked: ' + maxServerProcess,
+    text: `max server processes that will be forked: ${maxServerProcess}`,
     level: ServerConstants.LOG_TYPES.DEBUG
   });
 
   // Start forking child processes
   for (let i = 0; i < maxServerProcess; i++) {
 
-    workers.push(cluster.fork({
+    global.workers.push(cluster.fork({
       port: workerSocketServerPort
     }));
 
-    workers[i].on('disconnect', () => {
+    global.workers[i].on('disconnect', () => {
       logit({
-        text: 'worker ' + workers[i].id + ' has died.',
+        text: `worker ${global.workers[i].id} has died`,
         level: ServerConstants.LOG_TYPES.DEBUG
       });
     });
 
     //Handle message from any worker
-    workers[i].on('message', (message) => {
+    global.workers[i].on('message', (message) => {
       switch (message.type) {
 
         case MessageConstants.USER:
           if (message.data.connected) {
             // When new user got registered
-            global.connectedClients[message.data.username] = i;
+            global.connectedClients[message.data.username] = {
+              workerId: i
+            };
           } else {
+            const currentAppName = global.connectedClients[message.data.username][ServerConstants.CURRENT_APPLICATION];
             // When an user got disconnected
             delete global.connectedClients[message.data.username];
+            if (currentAppName) {
+              delete global.applicationsContext[currentAppName][message.data.username]
+            }
           }
 
           //Broadcast new user state to all connected users
           if (global.cmdFlags.broadcastNewConnection === 'all') {
-            let i = workers.length - 1;
+            let i = global.workers.length - 1;
             while (i >= 0) {
-              workers[i].send(message);
+              global.workers[i].send(message);
               i--;
             }
           }
@@ -86,7 +106,7 @@ async function configureMasterProcess() {
 
         case ServerConstants.IPC_MESSAGE_TYPES.WORKER_MESSAGE:
           if (global.connectedClients[message.data.to]) {
-            workers[global.connectedClients[message.data.to]].send(message);
+            global.workers[global.connectedClients[message.data.to].workerId].send(message);
           }
           break;
         default:

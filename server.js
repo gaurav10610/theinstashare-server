@@ -1,5 +1,4 @@
 const { ServerConstants, MessageConstants } = require('./src/utilities/AppConstants');
-const { registerApiEndpoints } = require('./src/api/controllers/web-apis-controller');
 const { configureWebsocketServer, broadcastMessage } = require('./src/ws/socket-server-impl');
 const http = require('http');
 const https = require('https');
@@ -15,14 +14,6 @@ async function configureSignalingServer() {
 
   await configureLogger();
 
-  if (cluster.isWorker) {
-
-    // logit({
-    //   text: 'worker process started with process id: ' + process.pid,
-    //   level: ServerConstants.LOG_TYPES.DEBUG
-    // });
-  }
-
   /**
    * server instance for socket server
    * 
@@ -34,6 +25,20 @@ async function configureSignalingServer() {
    * {'socket.id':{connection: peerConnection, channel : dataChannel}}
    */
   global.connectedClients = {};
+
+  /**
+   * this will keep track that which user is currently using which app
+   * 
+   * example - {
+   *  'p2p': {
+   *    'username': socketId // user's socket connection id 
+   *   }
+   * }
+   */
+  global.applicationsContext = {
+    p2p: {},
+    group_chat: {}
+  };
 
   // Server certificate and private key
   const options = await readServerCertificates('./ssl/new/');
@@ -56,50 +61,42 @@ async function configureSignalingServer() {
     // Setup websocket server
     configureWebsocketServer();
 
-    /**
-     * Don't need this api server when running in cluster mode as
-     * master server will be exposing same api endpoints
-     */
-    if (cluster.isMaster) {
-      registerApiEndpoints(options);
-    }
-
-    let serverPort = cluster.isMaster ? ServerConstants.SOCKET_SERVER_PORT_START_RANGE : process.env.port;
-
-    server.listen(serverPort, () => {
+    server.listen(process.env.port, () => {
       logit({
-        text: 'theinstashare socket server started at port: ' + serverPort,
+        text: `theinstashare socket server started at port: ${process.env.port}`,
         level: ServerConstants.LOG_TYPES.DEBUG
       });
     });
 
-    //This block is to achieve sticky session when running in cluster mode
-    if (cluster.isWorker) {
+    //listening for message event sent by master to catch the connection and resume
+    cluster.worker.on('message', (message, connection) => {
+      switch (message.type) {
 
-      //listning for message event sent by master to catch the connection and resume
-      cluster.worker.on('message', (message, connection) => {
-        switch (message.type) {
+        case ServerConstants.IPC_MESSAGE_TYPES.WORKER_MESSAGE:
+          // console.log('Process ' + process.pid + ' received worker message.');
+          socketServer.emit('message', message.data);
+          break;
 
-          case ServerConstants.IPC_MESSAGE_TYPES.WORKER_MESSAGE:
-            // console.log('Process ' + process.pid + ' received worker message.');
-            socketServer.emit('message', message.data);
-            break;
-
-          case MessageConstants.USER:
-            //console.log('Process ' + process.pid + ' received worker message.');
-            if (message.pid !== process.pid) {
-              broadcastMessage(message.data);
-            }
-            break;
-          default:
-        }
-      });
-    }
+        case ServerConstants.IPC_MESSAGE_TYPES.APP_REGISTER:
+          const applicationName = message.applicationName;
+          const username = message.username;
+          global.connectedClients[username][ServerConstants.CURRENT_APPLICATION] = applicationName;
+          global.applicationsContext[applicationName][username] = {
+            socketId: global.connectedClients[username].socketId
+          }
+          logit({
+            text: `${username} is registered as user for application ${applicationName}`,
+            level: ServerConstants.LOG_TYPES.DEBUG
+          });
+          break;
+        default:
+      }
+    });
 
   } catch (e) {
     console.log(e);
     logit({
-      text: 'error starting instashare server at port => ' + ServerConstants.EXPRESS_PORT,
+      text: `error starting instashare server at port => ${ServerConstants.EXPRESS_PORT}`,
       level: ServerConstants.LOG_TYPES.ERROR
     });
   }
