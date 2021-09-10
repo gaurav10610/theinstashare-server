@@ -1,5 +1,5 @@
 const e = require("express");
-const { ServerConstants } = require("../../utilities/AppConstants");
+const { ServerConstants, MessageConstants } = require("../../utilities/AppConstants");
 const { logit } = require('../../logger/logger-impl');
 
 /*
@@ -23,10 +23,10 @@ function getUserStatus(req, res) {
  */
 function getActiveUsers(req, res) {
   const prefix = req.query.prefix;
-  const appName = req.query.appName;
+  const groupName = req.query.groupName;
   let activeUsersList;
-  if (appName && appName.trim() !== '') {
-    activeUsersList = Object.keys(global.applicationsContext[appName]);
+  if (groupName && groupName.trim() !== '') {
+    activeUsersList = Object.keys(global.groupContext[groupName]);
   } else {
     activeUsersList = Object.keys(global.connectedClients);
   }
@@ -49,29 +49,34 @@ function checkPrefix(str) {
 }
 
 /**
- * handle user registeration in any theinstashare application
+ * handle user registeration in any theinstashare group
  * @param {*} req 
  * @param {*} res 
  */
-function handleAppRegistration(req, res) {
+function handleGroupRegistration(req, res) {
   const username = req.body.username;
-  const applicationName = req.body.applicationName;
+  const groupName = req.body.groupName;
   logit({
-    text: `received request for application registration for user: ${username} and application: ${applicationName}`,
+    text: `received request for group registration for user: ${username} and group: ${groupName}`,
     level: ServerConstants.LOG_TYPES.DEBUG
   });
   const errors = [];
-  if (username && applicationName) {
+  if (username && groupName) {
     if (username in global.connectedClients) {
 
-      if (!Object.values(ServerConstants.APPLICATION_NAMES).includes(applicationName)) {
+      /**
+       * validate group name as theinstashare have fixed group names
+       * @TODO make it more flexible afterwards
+       * 
+       */
+      if (!Object.values(ServerConstants.THEINSTASHARE_GROUP_NAMES).includes(groupName)) {
         errors.push({
-          message: 'invalid application name'
+          message: 'invalid group name'
         });
       } else {
-        global.connectedClients[username][ServerConstants.CURRENT_APPLICATION] = applicationName;
-        global.applicationsContext[applicationName][username] = {
-          socketId: global.connectedClients[username].socketId
+        global.connectedClients[username][ServerConstants.CURRENT_GROUP] = groupName;
+        global.groupContext[groupName][username] = {
+          workerId: global.connectedClients[username].workerId
         }
 
         /**
@@ -79,10 +84,27 @@ function handleAppRegistration(req, res) {
          */
         if (global.connectedClients[username]) {
           global.workers[global.connectedClients[username].workerId].send({
-            'applicationName': applicationName,
+            'groupName': groupName,
             'username': username,
-            'type': ServerConstants.IPC_MESSAGE_TYPES.APP_REGISTER
+            'type': ServerConstants.IPC_MESSAGE_TYPES.GROUP_REGISTER
           });
+        }
+
+        /**
+         * broadcast new user state to all user in appropriate group
+         */
+        if (global.cmdFlags.broadcastNewConnection === 'all') {
+          const message = {
+            type: MessageConstants.USER,
+            connected: true,
+            username: username
+          };
+          global.workers.forEach(worker => worker.send({
+            type: ServerConstants.IPC_MESSAGE_TYPES.BROADCAST_MESSAGE,
+            pid: process.pid,
+            data: message,
+            groupName: groupName
+          }));
         }
         res.status(200).send({
           registered: true
@@ -95,7 +117,7 @@ function handleAppRegistration(req, res) {
     }
   } else {
     errors.push({
-      message: 'username and applicationName is required'
+      message: 'username and groupName is required'
     });
   }
   if (errors.length > 0) {
@@ -105,18 +127,18 @@ function handleAppRegistration(req, res) {
   }
 }
 
-function getApplicationActiveUsers(req, res) {
-  const appName = req.query.appName;
-  if (appName && appName.trim() !== '') {
-    res.status(200).send(global.applicationsContext[appName]);
+function getActiveGroupUsers(req, res) {
+  const groupName = req.query.groupName;
+  if (groupName && groupName.trim() !== '') {
+    res.status(200).send(global.groupContext[groupName]);
   } else {
-    res.status(200).send(global.applicationsContext);
+    res.status(200).send(global.groupContext);
   }
 }
 
 module.exports = {
   getUserStatus,
   getActiveUsers,
-  handleAppRegistration,
-  getApplicationActiveUsers
+  handleGroupRegistration,
+  getActiveGroupUsers
 };

@@ -1,6 +1,5 @@
 const { ServerConstants, MessageConstants } = require('../utilities/AppConstants');
 const { logit } = require('../logger/logger-impl');
-const cluster = require('cluster');
 const async = require("async");
 
 /**
@@ -102,12 +101,12 @@ function webSocketServerError(error) {
 function registerSocketDisconnectHandler(socket, username) {
   //Registering disconnect listener
   socket.on('disconnect', (reason) => {
-    const currentAppName = global.connectedClients[username][ServerConstants.CURRENT_APPLICATION];
+    const currentAppName = global.connectedClients[username][ServerConstants.CURRENT_GROUP];
     delete global.connectedClients[username];
     if (currentAppName) {
-      delete global.applicationsContext[currentAppName][username]
+      delete global.groupContext[currentAppName][username]
     }
-    broadcastUserState(false, username);
+    broadcastUserState(false, username, currentAppName);
     logit({
       text: `${username} got disconnected!`,
       level: ServerConstants.LOG_TYPES.DEBUG
@@ -126,23 +125,24 @@ function sendSocketMessage(from, to, message) {
 
   try {
 
-    // When message has to be multicast
+    // When message has to be multicasted
     if (to instanceof Array) {
       async.forEach(to, (recipient, callback) => {
         if (global.connectedClients[recipient]) {
-          if (global.socketServer.sockets.sockets[global.connectedClients[recipient].socketId]) {
-            global.socketServer.sockets.sockets[global.connectedClients[recipient].socketId].send(message);
+          const recipientSocketId = global.connectedClients[recipient].socketId
+          if (recipientSocketId && global.socketServer.sockets.sockets[recipientSocketId]) {
+            global.socketServer.sockets.sockets[recipientSocketId].send(message);
           }
         } else {
 
-          // When running in cluster mode then recipient may be
-          // connected to some other server child
-          if (cluster.isWorker) {
-            process.send({
-              type: ServerConstants.IPC_MESSAGE_TYPES.WORKER_MESSAGE,
-              data: message
-            })
-          }
+          /* 
+          * recipient may be connected to some other server process
+          *
+          **/
+          process.send({
+            type: ServerConstants.IPC_MESSAGE_TYPES.WORKER_MESSAGE,
+            data: message
+          })
         }
       }, (err) => {
         //do nothing here
@@ -150,17 +150,15 @@ function sendSocketMessage(from, to, message) {
     } else {
 
       if (global.connectedClients[to]) {
-        if (global.socketServer.sockets.sockets[global.connectedClients[to].socketId]) {
-          global.socketServer.sockets.sockets[global.connectedClients[to].socketId].send(message);
+        const recipientSocketId = global.connectedClients[to].socketId
+        if (recipientSocketId && global.socketServer.sockets.sockets[recipientSocketId]) {
+          global.socketServer.sockets.sockets[recipientSocketId].send(message);
         }
       } else {
-        if (cluster.isWorker) {
-          process.send({
-            type: ServerConstants.IPC_MESSAGE_TYPES.WORKER_MESSAGE,
-            data: message
-          })
-        }
-
+        process.send({
+          type: ServerConstants.IPC_MESSAGE_TYPES.WORKER_MESSAGE,
+          data: message
+        })
       }
     }
   } catch (e) {
@@ -183,7 +181,7 @@ function registerUser(username, socket) {
       //When there is already an existing user
       reject();
     } else {
-      //Updating channel identifier in connected clients map with username
+      //Updating socket id in connected clients corresponding to username
       global.connectedClients[username] = {
         socketId: socket.id
       };
@@ -199,30 +197,27 @@ function registerUser(username, socket) {
  */
 function deRegisterUser(username, socket) {
   if (global.connectedClients[username]) {
+    const currentGroupName = global.connectedClients[username][ServerConstants.CURRENT_GROUP]
     delete global.connectedClients[username];
+    if (currentGroupName) {
+      delete global.groupContext[currentGroupName][username];
+    }
     socket.removeAllListeners('disconnect');
     logit({
-      text: `${username} got de-registered from server`,
+      text: `${username} got de-registered message from client`,
       level: ServerConstants.LOG_TYPES.DEBUG
     });
-    broadcastUserState(false, username);
+    broadcastUserState(false, username, currentGroupName);
   }
 }
 
-function broadcastMessage(message) {
-  async.forEach(Object.keys(global.connectedClients), (user, callback) => {
-    sendSocketMessage(ServerConstants.RTC_SERVER, user, message);
-  }, (err) => {
-    //console.log('iterating done');
-  });
-}
-
 /**
- * This method will send an update to all user about new user connected or disconnected
+ * This method will send an update to all users about new user connected or disconnected
  * @param  {Boolean} isConnected : flag to distinguish between connect or disconnect event
  * @param  {String}  username    : username of the user connected or disconnected
+ * @param {String} currentGroupName: current group of user
  */
-function broadcastUserState(isConnected, username) {
+function broadcastUserState(isConnected, username, currentGroupName) {
   //Update all users for newly connected user
   const message = {
     type: MessageConstants.USER,
@@ -230,21 +225,35 @@ function broadcastUserState(isConnected, username) {
     username: username
   };
 
-  if (cluster.isWorker) {
-    //Updating master
-    process.send({
-      type: MessageConstants.USER,
-      pid: process.pid,
-      data: message
-    });
-  }
+  //broadcast user state to to 
+  process.send({
+    type: MessageConstants.USER,
+    pid: process.pid,
+    data: message
+  });
 
-  if (global.cmdFlags.broadcastNewConnection === 'all') {
-    broadcastMessage(message);
+  /**
+   * broadcast disconnected state
+   */
+  if (isConnected === false) {
+    broadCastMessage(message, currentGroupName)
   }
 }
 
+/**
+ * broadcast any message via master process to all the clients connected to all the process servers
+ * @param {*} message 
+ * @param {*} groupName 
+ */
+function broadCastMessage(message, groupName) {
+  process.send({
+    type: ServerConstants.IPC_MESSAGE_TYPES.BROADCAST_MESSAGE,
+    pid: process.pid,
+    data: message,
+    groupName: groupName
+  });
+}
+
 module.exports = {
-  configureWebsocketServer,
-  broadcastMessage
+  configureWebsocketServer
 };

@@ -1,11 +1,12 @@
-const { ServerConstants, MessageConstants } = require('./src/utilities/AppConstants');
-const { configureWebsocketServer, broadcastMessage } = require('./src/ws/socket-server-impl');
+const { ServerConstants } = require('./src/utilities/AppConstants');
+const { configureWebsocketServer } = require('./src/ws/socket-server-impl');
 const http = require('http');
 const https = require('https');
 const io = require('socket.io');
 const cluster = require('cluster');
 const { configureLogger, logit } = require('./src/logger/logger-impl');
 const { readServerCertificates } = require('./src/utilities/app-utils');
+const async = require("async");
 
 /**
  * this will instantiate a single instance of server
@@ -27,7 +28,7 @@ async function configureSignalingServer() {
   global.connectedClients = {};
 
   /**
-   * this will keep track that which user is currently using which app
+   * this will keep track that which user is currently using which group
    * 
    * example - {
    *  'p2p': {
@@ -35,7 +36,7 @@ async function configureSignalingServer() {
    *   }
    * }
    */
-  global.applicationsContext = {
+  global.groupContext = {
     p2p: {},
     group_chat: {}
   };
@@ -70,23 +71,38 @@ async function configureSignalingServer() {
 
     //listening for message event sent by master to catch the connection and resume
     cluster.worker.on('message', (message, connection) => {
+      logit({
+        text: `received message on worker process ${JSON.stringify(message)}`,
+        level: ServerConstants.LOG_TYPES.DEBUG
+      });
       switch (message.type) {
-
         case ServerConstants.IPC_MESSAGE_TYPES.WORKER_MESSAGE:
-          // console.log('Process ' + process.pid + ' received worker message.');
           socketServer.emit('message', message.data);
           break;
 
-        case ServerConstants.IPC_MESSAGE_TYPES.APP_REGISTER:
-          const applicationName = message.applicationName;
+        case ServerConstants.IPC_MESSAGE_TYPES.GROUP_REGISTER:
+          const groupName = message.groupName;
           const username = message.username;
-          global.connectedClients[username][ServerConstants.CURRENT_APPLICATION] = applicationName;
-          global.applicationsContext[applicationName][username] = {
+          global.connectedClients[username][ServerConstants.CURRENT_GROUP] = groupName;
+          global.groupContext[groupName][username] = {
             socketId: global.connectedClients[username].socketId
           }
-          logit({
-            text: `${username} is registered as user for application ${applicationName}`,
-            level: ServerConstants.LOG_TYPES.DEBUG
+          break;
+
+        case ServerConstants.IPC_MESSAGE_TYPES.BROADCAST_MESSAGE:
+          /**
+           * broadcast message either to all clients within a particular group or all the connected clients
+           */
+          const connectedClients = message.groupName ? global.groupContext[message.groupName] : global.connectedClients;
+          async.forEach(Object.keys(connectedClients), (recipient, callback) => {
+            if (global.connectedClients[recipient]) {
+              const recipientSocketId = global.connectedClients[recipient].socketId
+              if (recipientSocketId && global.socketServer.sockets.sockets[recipientSocketId]) {
+                global.socketServer.sockets.sockets[recipientSocketId].send(message.data);
+              }
+            }
+          }, (err) => {
+            //console.log('iterating done');
           });
           break;
         default:

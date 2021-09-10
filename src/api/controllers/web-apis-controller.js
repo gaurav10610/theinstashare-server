@@ -1,5 +1,5 @@
 const { ServerConstants } = require('../../utilities/AppConstants');
-const { getUserStatus, getActiveUsers, handleAppRegistration, getApplicationActiveUsers } = require('../impl/service-impl');
+const { getUserStatus, getActiveUsers, handleGroupRegistration, getActiveGroupUsers } = require('../impl/service-impl');
 const express = require('express');
 const bodyParser = require('body-parser');
 const http = require('http');
@@ -37,12 +37,12 @@ function registerApiEndpoints(options) {
      */
     app.get(`${ServerConstants.API_BASE_URL}active/users`, getActiveUsers);
 
-    app.get(`${ServerConstants.API_BASE_URL}application/users`, getApplicationActiveUsers);
+    app.get(`${ServerConstants.API_BASE_URL}group/users`, getActiveGroupUsers);
 
     /**
-     * handle user registeration in any application
+     * handle user registeration in any group
      */
-    app.post(`${ServerConstants.API_BASE_URL}application/register`, handleAppRegistration);
+    app.post(`${ServerConstants.API_BASE_URL}group/register`, handleGroupRegistration);
 
     if (global.cmdFlags.ssl) {
 

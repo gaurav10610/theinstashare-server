@@ -1,6 +1,6 @@
 const cluster = require('cluster');
 const cpus = require('os').cpus().length;
-const { ServerConstants, StatusConstants, MessageConstants } = require('./src/utilities/AppConstants');
+const { ServerConstants, MessageConstants } = require('./src/utilities/AppConstants');
 const { parseCmdFlags, readServerCertificates } = require('./src/utilities/app-utils');
 const { registerApiEndpoints } = require('./src/api/controllers/web-apis-controller');
 const { configureLogger, logit } = require('./src/logger/logger-impl');
@@ -8,7 +8,6 @@ const { configureSignalingServer } = require('./server');
 
 /**
  * this will configure master process when server is running in cluster mode
- * 
  * 
  */
 async function configureMasterProcess() {
@@ -29,7 +28,7 @@ async function configureMasterProcess() {
   global.connectedClients = {};
 
   /**
-   * this will keep track that which user is currently using which app
+   * this will keep track that which user is currently using which group
    * 
    * example - {
    *  'p2p': {
@@ -37,7 +36,7 @@ async function configureMasterProcess() {
    *   }
    * }
    */
-  global.applicationsContext = {
+  global.groupContext = {
     p2p: {},
     group_chat: {}
   };
@@ -77,6 +76,10 @@ async function configureMasterProcess() {
 
     //Handle message from any worker
     global.workers[i].on('message', (message) => {
+      logit({
+        text: `received message on master process ${JSON.stringify(message)}`,
+        level: ServerConstants.LOG_TYPES.DEBUG
+      });
       switch (message.type) {
 
         case MessageConstants.USER:
@@ -86,39 +89,32 @@ async function configureMasterProcess() {
               workerId: i
             };
           } else {
-            const currentAppName = global.connectedClients[message.data.username][ServerConstants.CURRENT_APPLICATION];
             // When an user got disconnected
+            const currentGroupName = global.connectedClients[message.data.username][ServerConstants.CURRENT_GROUP];
             delete global.connectedClients[message.data.username];
-            if (currentAppName) {
-              delete global.applicationsContext[currentAppName][message.data.username]
-            }
-          }
-
-          //Broadcast new user state to all connected users
-          if (global.cmdFlags.broadcastNewConnection === 'all') {
-            let i = global.workers.length - 1;
-            while (i >= 0) {
-              global.workers[i].send(message);
-              i--;
+            if (currentGroupName) {
+              delete global.groupContext[currentGroupName][message.data.username]
             }
           }
           break;
 
         case ServerConstants.IPC_MESSAGE_TYPES.WORKER_MESSAGE:
-          if (global.connectedClients[message.data.to]) {
-            global.workers[global.connectedClients[message.data.to].workerId].send(message);
+          const recipientServerWorkerId = global.connectedClients[message.data.to].workerId;
+          if (recipientServerWorkerId) {
+            global.workers[recipientServerWorkerId].send(message);
           }
           break;
+
+        case ServerConstants.IPC_MESSAGE_TYPES.BROADCAST_MESSAGE:
+          global.workers.forEach(worker => worker.send(message));
+          break;
+
         default:
+          //do nothing
       }
     });
 
-    /**
-     * 
-     * increment the port number
-     */
     workerSocketServerPort++;
-
   }
 }
 
