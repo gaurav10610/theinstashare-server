@@ -31,6 +31,10 @@ function parseCmdFlags() {
     if (val.indexOf('--stopAllLogs') >= 0) {
       if (val.split('=')[1].toString() === 'true') global.cmdFlags.stopAllLogs = true;
     }
+
+    if (val.indexOf('--maxServerProcess') >= 0) {
+      global.cmdFlags['maxServerProcess'] = parseInt(val.split('=')[1].toString());
+    }
   });
 }
 
