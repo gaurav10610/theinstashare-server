@@ -14,7 +14,7 @@ function configureLogger() {
         if (cluster.isMaster) {
           logFileName = 'logs/master-server.log'
         } else {
-          logFileName = 'logs/' + process.env.port + '-server.log'
+          logFileName = `logs/${process.env.port}-server.log`
         }
         transports.push(new winston.transports.File({
           filename: logFileName

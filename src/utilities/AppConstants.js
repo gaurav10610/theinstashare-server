@@ -1,5 +1,10 @@
 module.exports = {
     ServerConstants: {
+        THEINSTASHARE_GROUP_NAMES: {
+            P2P: 'p2p',
+            GROUP_CHAT: 'group_chat'
+        },
+        CURRENT_GROUP: 'currentGroup',
         SOCKET_SERVER_PORT_START_RANGE: 9090,
         EXPRESS_PORT: 9191,
         API_BASE_URL: "/instashare/users/",
@@ -17,7 +22,9 @@ module.exports = {
         IPC_MESSAGE_TYPES: {
             LOG: 'log',
             STICKY_SESSION: 'sticky',
-            WORKER_MESSAGE: 'worker'
+            WORKER_MESSAGE: 'worker',
+            GROUP_REGISTER: 'group-register',
+            BROADCAST_MESSAGE: 'broadcast'
         },
         RTC_SERVER: "rtc_server",
         STUN_CONFIG: {
