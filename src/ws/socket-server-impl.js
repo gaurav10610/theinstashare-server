@@ -26,7 +26,7 @@ function webSocketConnection(socket) {
 function webSocketMessageReceived(message) {
   try {
     logit({
-      text: `message on socket|type: ${message.type}|from: ${message.from}|to: ${message.to}`,
+      text: `received message on socket server ${JSON.stringify(message)}`,
       level: ServerConstants.LOG_TYPES.DEBUG
     });
 
@@ -89,7 +89,7 @@ function webSocketError(error) {
 function webSocketServerError(error) {
   logit({
     text: `websocket server error with reason: ${error}`,
-    level: ServerConstants.ERROR
+    level: ServerConstants.LOG_TYPES.ERROR
   });
 }
 
