@@ -99,9 +99,14 @@ async function configureMasterProcess() {
           break;
 
         case ServerConstants.IPC_MESSAGE_TYPES.WORKER_MESSAGE:
-          const recipientServerWorkerId = global.connectedClients[message.data.to].workerId;
-          if (recipientServerWorkerId) {
+          if(global.connectedClients[message.data.to]) {
+            const recipientServerWorkerId = global.connectedClients[message.data.to].workerId;
             global.workers[recipientServerWorkerId].send(message);
+          } else {
+            logit({
+              text: `unable to send message to ${message.data.to} as there is no connected user with such name`,
+              level: ServerConstants.LOG_TYPES.DEBUG
+            });
           }
           break;
 
