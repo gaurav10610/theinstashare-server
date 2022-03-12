@@ -38,7 +38,8 @@ async function configureSignalingServer() {
    */
   global.groupContext = {
     p2p: {},
-    group_chat: {}
+    group_chat: {},
+    file_transfer: {}
   };
 
   // Server certificate and private key

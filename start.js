@@ -38,7 +38,8 @@ async function configureMasterProcess() {
    */
   global.groupContext = {
     p2p: {},
-    group_chat: {}
+    group_chat: {},
+    file_transfer: {}
   };
 
   logit({
