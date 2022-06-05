@@ -2,7 +2,8 @@ module.exports = {
     ServerConstants: {
         THEINSTASHARE_GROUP_NAMES: {
             P2P: 'p2p',
-            GROUP_CHAT: 'group_chat'
+            GROUP_CHAT: 'group_chat',
+            FILE_TRANSFER: 'file_transfer'
         },
         CURRENT_GROUP: 'currentGroup',
         SOCKET_SERVER_PORT_START_RANGE: 9090,
